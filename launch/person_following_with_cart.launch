@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+    <arg name="path_to_ckpt" default="$(find person_tracking)/tf_models/ssd/frozen_inference_graph.pb" />
+    <arg name="cam_sub" default="/sensorring_cam3d/rgb/image_rect_color" />
+    <arg name="depth_sub" default="/sensorring_cam3d/depth/image_rect" />
+    <arg name="path_to_faceTfModels" default="$(find face_recognizer)/config/" />
+    <arg name="fixed_frame" default="/odom_combined"/>
+    <arg name="prob_person" default="0.7">
+
+    <!-- parameters for leg_detection node -->
+    <param name="forest_file" value="$(find leg_tracker)/config/trained_leg_detector_res=0.33.yaml" />
+    <param name="scan_topic" value="/scan" />
+    <param name="scan_frequency" value="7.5"/>  
+
+    <!-- adding person_tracker launch file -->
+    <include file="$(find person_tracking)/launch/person_detection.launch">
+        <param name="path_to_ckpt" value="$(arg path_to_ckpt)" type = "str"/>
+        <param name="cam_sub" value="$(arg cam_sub)" type="string" />
+        <param name="depth_sub" value="$(arg depth_sub)" type="string">
+        <param name="fixed_frame" value="$(arg fixed_frame)" type="string" />
+        <param name="prob_person" value="$(arg prob_person)" type="float" />
+    </include>
+
+    <!-- adding face_recognizer launch file -->
+    <include file="$(find face_recognizer)/launch/face_recognizer.launch">
+        <param name="path_to_faceTfModels" value="$(arg path_to_faceTfModels)" type="string" />
+        <param name="cam_sub" value="$(arg cam_sub)" type="string" />
+        <param name="fixed_frame" value="$(arg fixed_frame)" type="string" />
+        <param name="thr_face" value="$(arg thr_face)" type="float" />
+        <param name="depth_sub" value="$(arg depth_sub)" type="string">
+    </include>
+
+    <!-- Reducing frequency of the Laser scan and running leg detector-->
+    <node name="laser_scan_throttler" type="throttle" pkg="topic_tools" args="messages /scan_unified 7.5 /scan"/>
+    <node pkg="leg_tracker" type="detect_leg_clusters" name="leg_clusters" output="screen"/>
+
+    <!-- Tracker -->
+    <node pkg="person_following" type="user_tracker_with_cart.py" name="tracker_with_cart" output="screen"/>
+
+    <!-- Goal pose generator -->
+    <node pkg="person_following" type="goal_generation.py" name="goal_generator" output="screen" />
+
+</launch>
